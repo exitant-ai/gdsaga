@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>무한순환 백테스터 · QQQ 시뮬레이션</title>
+<style>
+:root{
+  --bg:#000; --panel:#0a1610; --panel2:#0d1d14; --line:#1a3326; --line2:#26402f;
+  --neon:#00ff9d; --neon-dim:#0ac77a; --neon-deep:#063d28;
+  --ink:#e8fff5; --muted:#5f8a76; --muted2:#3d5f50;
+  --red:#ff5c5c; --blue:#3aa0ff; --amber:#e0a23a;
+  --mono:'SF Mono',ui-monospace,'Cascadia Code',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Pretendard',sans-serif;
+  line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;
+  background-image:radial-gradient(ellipse 80% 50% at 50% 100%,rgba(0,255,157,.13),transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 0%,rgba(0,255,157,.05),transparent 60%),
+    linear-gradient(180deg,#000 0%,#03100a 55%,#051c12 100%);
+  background-attachment:fixed;padding:18px 12px 50px}
+.wrap{max-width:480px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:16px}
+.brand .dot{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--neon),var(--neon-dim));
+  display:flex;align-items:center;justify-content:center;color:#031;font-weight:900;font-size:17px;box-shadow:0 0 22px rgba(0,255,157,.4)}
+.brand b{font-family:var(--mono);letter-spacing:.06em;font-size:15px}.brand b .x{color:var(--neon)}
+.brand .tag{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.14em}
+.hidden{display:none!important}
+
+/* ---------- SETUP WIZARD ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.card h3{font-size:13px;font-family:var(--mono);color:var(--neon);letter-spacing:.04em;margin-bottom:3px;
+  display:flex;align-items:center;gap:8px}
+.card h3 .qhint{font-size:10px;color:var(--muted);font-weight:500;font-family:var(--mono)}
+.card h3 .n{width:20px;height:20px;border-radius:6px;background:var(--neon-deep);border:1px solid var(--neon-dim);
+  color:var(--neon);font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:800}
+.card .desc{font-size:11px;color:var(--muted);margin-bottom:11px;line-height:1.5}
+.field{margin-bottom:11px}
+.field:last-child{margin-bottom:0}
+label.lb{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px}
+label.lb b{color:var(--ink);font-weight:700}
+input[type=number],input[type=date],select{width:100%;background:#06120c;border:1px solid var(--line2);
+  color:var(--ink);border-radius:10px;padding:10px 11px;font-family:var(--mono);font-size:14px;outline:none}
+input:focus,select:focus{border-color:var(--neon-dim)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{flex:1;min-width:80px;text-align:center;background:#06120c;border:1px solid var(--line2);border-radius:10px;
+  padding:11px 8px;cursor:pointer;font-family:var(--mono);font-size:13px;transition:.12s}
+.chip small{display:block;font-size:9.5px;color:var(--muted);margin-top:2px;font-family:-apple-system,sans-serif}
+.chip:hover{border-color:var(--neon-dim)}
+.chip.sel{background:var(--neon-deep);border-color:var(--neon);color:var(--neon);box-shadow:0 0 14px rgba(0,255,157,.2)}
+.chip.sel small{color:var(--neon-dim)}
+.slwrap{display:flex;align-items:center;gap:11px}
+input[type=range]{flex:1;accent-color:var(--neon)}
+.slval{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--neon);min-width:48px;text-align:right}
+.hint{font-size:10.5px;color:var(--muted2);margin-top:5px;font-family:var(--mono);line-height:1.55}
+.runbtn{width:100%;background:linear-gradient(135deg,var(--neon),var(--neon-dim));color:#031;border:none;
+  border-radius:13px;padding:15px;font-family:var(--mono);font-weight:800;font-size:15px;cursor:pointer;
+  box-shadow:0 6px 22px rgba(0,255,157,.3);letter-spacing:.03em}
+.runbtn:active{transform:scale(.98)}
+.warnbox{background:rgba(255,92,92,.07);border:1px solid #5a2222;border-radius:10px;padding:9px 11px;
+  font-size:10.5px;color:#ffb3b3;line-height:1.55;margin-top:10px}
+
+.datefield{width:100%;background:#06120c;border:1px solid var(--line2);color:var(--ink);border-radius:10px;padding:11px 12px;font-family:var(--mono);font-size:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.datefield:hover{border-color:var(--neon-dim)}
+.datefield.active{border-color:var(--neon);box-shadow:0 0 12px rgba(0,255,157,.18)}
+.datefield .ph{color:var(--muted)}
+.datefield .cic{color:var(--neon-dim);font-size:12px}
+.cal{margin:10px 0 4px;background:#06120c;border:1px solid var(--neon-dim);border-radius:12px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.cal-which{font-family:var(--mono);font-size:11px;color:var(--neon-dim);margin-bottom:9px;letter-spacing:.04em}
+.cal-hd{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.cal-hd select{flex:1;padding:7px 8px;font-size:13px;background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:8px;font-family:var(--mono)}
+.cal-hd button{background:var(--panel2);border:1px solid var(--line2);color:var(--ink);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:16px;font-family:var(--mono);flex-shrink:0}
+.cal-hd button:hover{border-color:var(--neon-dim)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-grid .dow{font-size:10px;color:var(--muted);text-align:center;padding:3px 0;font-family:var(--mono)}
+.cal-grid .day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-family:var(--mono);font-size:12.5px;cursor:pointer;border:1px solid transparent;color:var(--ink)}
+.cal-grid .day:hover{background:var(--neon-deep);border-color:var(--neon-dim)}
+.cal-grid .day.sel{background:var(--neon);color:#031;font-weight:800}
+.cal-grid .day.inrange{background:rgba(0,255,157,.1)}
+.cal-grid .day.dis{color:var(--muted2);opacity:.25;cursor:not-allowed;pointer-events:none}
+.cal-grid .day.empty{cursor:default;pointer-events:none}
+.cal-close{width:100%;margin-top:9px;background:var(--neon-deep);border:1px solid var(--neon-dim);color:var(--neon);border-radius:9px;padding:9px;font-family:var(--mono);font-size:12.5px;font-weight:700;cursor:pointer}
+
+/* ---------- SIM ---------- */
+.ticker{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;padding:11px 14px;margin-bottom:10px}
+.ticker .sym{font-family:var(--mono);font-weight:800;font-size:13px}
+.ticker .sym small{color:var(--muted);font-weight:500;font-size:10px;margin-left:5px}
+.ticker .date{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+.ticker .px{font-family:var(--mono);font-size:22px;font-weight:800}
+.ticker .chg{font-family:var(--mono);font-size:12px;font-weight:700}
+.up{color:var(--neon)}.dn{color:var(--red)}
+.bigdate{text-align:center;font-family:var(--mono);font-weight:800;font-size:27px;letter-spacing:.02em;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.bigdate .yd{color:var(--neon)}
+.bigdate.flip{animation:dflip .35s ease}
+@keyframes dflip{0%{opacity:.2;transform:translateY(-5px)}100%{opacity:1;transform:translateY(0)}}
+.assetbar{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px;font-family:var(--mono)}
+.assetbar .ab-col{text-align:center}
+.assetbar .ab-l{display:block;font-size:10px;color:var(--muted);margin-bottom:2px}
+.assetbar .ab-v{font-size:22px;font-weight:800}
+.assetbar .ab-arrow{font-size:20px;color:var(--neon-dim);font-weight:800}
+.assetbar .ab-ret{width:100%;text-align:center;font-size:14px;font-weight:800;margin-top:3px}
+.setbar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-bottom:10px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7}
+.setbar b{color:var(--neon-dim);font-weight:700}
+.setbar .pd{color:var(--ink);font-weight:700}
+#chartWrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px}
+#chartWrap .clab{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:4px}
+canvas{width:100%;height:150px;display:block}
+
+.tg{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 10px 50px rgba(0,0,0,.6)}
+.tg-hd{display:flex;align-items:center;gap:11px;padding:12px 14px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.tg-av{width:38px;height:38px;border-radius:50%;background:var(--neon-deep);border:1px solid var(--neon-dim);
+  display:flex;align-items:center;justify-content:center;font-size:19px}
+.tg-hd .nm{font-size:14px;font-weight:700}.tg-hd .st{font-size:11px;color:var(--neon-dim)}
+.tg-hd .st .blip{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--neon);margin-right:5px;
+  box-shadow:0 0 6px var(--neon);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.tg-body{padding:14px 12px;display:flex;flex-direction:column;gap:9px;height:46vh;min-height:300px;overflow-y:auto;scroll-behavior:smooth}
+.tg-body::-webkit-scrollbar{width:5px}.tg-body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+.b{max-width:93%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.62;white-space:pre-wrap;word-break:break-word;animation:in .2s ease}
+@keyframes in{from{opacity:0;transform:translateY(5px)}}
+.bot{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.usr{align-self:flex-end;background:var(--neon-deep);border:1px solid var(--neon-dim);border-bottom-right-radius:4px;font-family:var(--mono);font-size:12px}
+.sys{align-self:center;max-width:94%;background:rgba(255,255,255,.03);border:1px dashed var(--line2);font-size:11px;color:var(--muted);border-radius:10px;text-align:center}
+.div{align-self:center;font-size:10.5px;color:var(--muted);background:rgba(0,255,157,.06);padding:3px 13px;border-radius:10px;margin:4px 0;font-family:var(--mono);letter-spacing:.06em}
+.hd{font-weight:800;font-size:13px;display:block;margin-bottom:3px;color:var(--neon)}
+.tm{font-size:10px;color:var(--muted2);margin-top:4px;font-family:var(--mono)}
+.buy{border-left:3px solid var(--blue)}.store{border-left:3px solid var(--amber)}.inj{border-left:3px solid var(--neon)}.liq{border-left:3px solid var(--red)}.hold{border-left:3px solid var(--line2);opacity:.92}.tp{border-left:3px solid var(--neon)}.qc{border-left:3px solid var(--gold)}.qcicon{color:var(--gold);font-weight:800}
+.lab{color:var(--muted)}.mono{font-family:var(--mono)}.prog{font-family:var(--mono);font-size:11px;color:var(--muted)}
+button.cb:disabled{opacity:.4;pointer-events:none}
+button.cb.reconf{border-color:var(--neon-dim);color:var(--neon)}
+button.cb.spd{font-size:12px}
+button.cb.spd.on{background:linear-gradient(135deg,var(--neon),var(--neon-dim));color:#031;border:none;box-shadow:0 3px 14px rgba(0,255,157,.3)}
+.speedlbl{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:2px}
+.snap{border-left:3px solid var(--neon-dim)}
+.pos{color:var(--neon);font-weight:700}.neg{color:var(--red);font-weight:700}
+.totbox{border:1px solid var(--line2);border-radius:10px;padding:9px 11px;margin-top:6px;background:rgba(0,255,157,.04);font-size:12px;line-height:1.7}
+.totbox b.big{font-size:15px}
+.acct{display:flex;gap:8px;margin:8px 0 2px}
+.acc{flex:1;border-radius:9px;padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.acc .l{font-size:10px;color:var(--muted)}.acc .v{font-size:14px;font-weight:700;font-family:var(--mono);margin-top:2px}
+.acc.t{border-left:3px solid var(--blue)}.acc.f{border-left:3px solid var(--amber)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:7px;font-size:12px;font-family:var(--mono)}
+.grid2 .k{color:var(--muted);font-family:-apple-system,sans-serif}
+.flag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:7px;font-family:var(--mono);background:rgba(0,255,157,.1);color:var(--neon-dim);margin-left:5px}
+
+.ctrl{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:7px;flex-wrap:wrap}
+button.cb{font-family:var(--mono);font-size:12.5px;font-weight:700;cursor:pointer;border-radius:11px;padding:11px 10px;transition:.12s;letter-spacing:.01em;flex:1;background:var(--panel2);color:var(--ink);border:1px solid var(--line2)}
+button.cb:active{transform:scale(.96)}button.cb:hover{border-color:var(--neon-dim)}
+button.cb.primary{background:linear-gradient(135deg,var(--neon),var(--neon-dim));color:#031;border:none}
+button.cb.warn{color:var(--red);border-color:#5a2222}
+button.cb.ghost{background:transparent;color:var(--muted)}
+.note{font-size:10.5px;color:var(--muted2);text-align:center;font-family:var(--mono);line-height:1.6;margin-top:2px}
+.costnote{font-size:10px;color:var(--neon-dim);text-align:center;font-family:var(--mono);line-height:1.7;margin-top:9px;background:rgba(0,255,157,.05);border:1px solid var(--line2);border-radius:9px;padding:8px 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div class="dot">∞</div><b>INFINITE<span class="x">CYCLE</span></b><span class="tag">BACKTESTER · 실데이터</span></div>
+
+  <!-- ===== SETUP ===== -->
+  <div id="setup">
+    <div class="card">
+      <h3><span class="n">1</span>자산 · 종목</h3>
+      <div class="desc">총 계좌(USD)와 운용 종목 하나를 선택합니다. 무한순환은 단일 종목·중복투자 없음.</div>
+      <div class="field">
+        <label class="lb">총 계좌 <b>USD</b></label>
+        <input type="number" id="cap" value="1000" min="100" step="100">
+      </div>
+      <div class="field">
+        <label class="lb">종목 선택</label>
+        <div class="chips" id="assetChips">
+          <div class="chip sel" data-a="QQQ">QQQ<small>나스닥100 ETF</small></div>
+          <div class="chip" data-a="TQQQ">TQQQ<small>3배 ETF·실제종가</small></div>
+          <div class="chip" data-a="NDX">NDX<small>나스닥100 지수</small></div>
+        </div>
+        <div class="hint" id="dataRange"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">2</span>레버리지</h3>
+      <div class="desc">보유 포지션에 적용할 배율. 레버리지는 원금 전액 손실(강제청산)이 가능합니다.</div>
+      <div class="slwrap"><input type="range" id="lev" min="1" max="5" step="1" value="3"><span class="slval" id="levV">3배</span></div>
+      <div class="hint">TQQQ 선택 시 ETF 자체가 3배라 배율은 1로 두는 것을 권장.</div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">3</span>분할매수 (진입)</h3>
+      <div class="desc">매 거래일 운용자산 대비 몇 %를 매수할지. 오른 날(상승일)은 적게, 내린 날(하락일)은 더 사서 평단가를 낮춥니다.</div>
+      <div class="two">
+        <div class="field"><label class="lb">상승일 진입 <b>%</b></label><input type="number" id="eUp" value="1" min="0.1" max="10" step="0.1"></div>
+        <div class="field"><label class="lb">하락일 진입 <b>%</b></label><input type="number" id="eDn" value="3" min="0.1" max="10" step="0.1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">4</span>익절 방식 <span class="qhint">· 상승/하락 각각</span></h3>
+      <div class="desc">매수한 물량은 <b>매수가 대비 +N% 오르면 자동 익절</b>됩니다. 상승일에 산 물량과 하락일에 산 물량의 익절 목표를 각각 정하세요. (무한순환매 핵심)</div>
+      <div class="two">
+        <div class="field"><label class="lb">상승일 매수분 익절 <b>+%</b></label><input type="number" id="utp" value="10" min="1" max="200" step="1"></div>
+        <div class="field"><label class="lb">하락일 매수분 익절 <b>+%</b></label><input type="number" id="dtp" value="10" min="1" max="200" step="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">5</span>보관 · 투입 <span class="qhint">· 금고 관리</span></h3>
+      <div class="desc">보관: 운용자산이 +N% 성장할 때마다 총자산의 X%를 금고로 확보. 투입: 총자산이 −M% 하락할 때마다 금고의 Y%를 트레이딩으로 재투입. (원본 기본값 50/50/50/50)</div>
+      <div class="two">
+        <div class="field"><label class="lb">보관 발동 <b>운용 +%</b></label><input type="number" id="sUp" value="50" min="2" max="500" step="1"></div>
+        <div class="field"><label class="lb">보관 비율 <b>총자산 %</b></label><input type="number" id="sPct" value="10" min="1" max="100" step="1"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label class="lb">투입 발동 <b>−%</b></label><input type="number" id="iDn" value="50" min="2" max="90" step="1"></div>
+        <div class="field"><label class="lb">투입 비율 <b>금고 %</b></label><input type="number" id="iPct" value="50" min="1" max="100" step="1"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="n">6</span>백테스트 기간</h3>
+      <div class="desc">실제 일별 종가로 구동합니다. 빠른 선택을 누르거나 시작·종료일을 직접 지정하세요.</div>
+      <div class="chips" id="rangePresets" style="margin-bottom:11px">
+        <div class="chip" data-y="1">1년</div>
+        <div class="chip" data-y="3">3년</div>
+        <div class="chip" data-y="5">5년</div>
+        <div class="chip" data-y="10">10년</div>
+        <div class="chip" data-y="0">전체</div>
+      </div>
+      <div class="two">
+        <div class="field"><label class="lb">시작일</label><div class="datefield" id="d0btn"><span id="d0txt" class="ph">날짜 선택</span><span class="cic">▾</span></div></div>
+        <div class="field"><label class="lb">종료일</label><div class="datefield" id="d1btn"><span id="d1txt" class="ph">날짜 선택</span><span class="cic">▾</span></div></div>
+      </div>
+      <div id="calBox"></div>
+      <div class="hint" id="rangeReadout" style="color:var(--neon-dim);font-size:11.5px;margin-top:8px">—</div>
+      <div class="warnbox">⚠ 본 시뮬레이션은 과거 실데이터 기반 가상 백테스트이며, 미래 수익을 보장하지 않습니다. 레버리지는 원금 전액 손실이 가능합니다.</div>
+      <div class="costnote">✔ 거래비용 자동 반영 · 슬리피지 0.02% · 왕복수수료 0.04%(지정가) · 펀딩 0.005%/개장일</div>
+    </div>
+
+    <button class="runbtn" id="runBtn">▶ 이 기간으로 봇 구동 시작 →</button>
+  </div>
+
+  <!-- ===== SIM ===== -->
+  <div id="sim" class="hidden">
+    <div class="bigdate" id="bigDate">—</div>
+    <div class="ticker">
+      <div>
+        <div class="sym" id="symLbl">QQQ <small>3배</small></div>
+        <div class="date" id="dateLbl">—</div>
+      </div>
+      <div style="text-align:right">
+        <div class="px" id="pxLbl">—</div>
+        <div class="chg" id="chgLbl">—</div>
+      </div>
+    </div>
+
+    <div class="assetbar">
+      <div class="ab-col"><span class="ab-l">시작 자산</span><span class="ab-v" id="abStart">—</span></div>
+      <div class="ab-arrow">→</div>
+      <div class="ab-col"><span class="ab-l">현재 자산</span><span class="ab-v" id="abNow">—</span></div>
+      <div class="ab-ret" id="abRet">—</div>
+    </div>
+
+    <div class="setbar" id="setBar"></div>
+
+    <div id="chartWrap">
+      <div class="clab"><span>총자산 곡선 · 가로 날짜 / 세로 USD</span><span id="progLbl">0%</span></div>
+      <canvas id="chart" height="150"></canvas>
+    </div>
+
+    <div class="tg">
+      <div class="tg-hd"><div class="tg-av">🤖</div>
+        <div><div class="nm">무한순환 봇 · <span id="symHd">QQQ</span></div>
+        <div class="st"><span class="blip"></span>실데이터 백테스트 · 데모</div></div></div>
+      <div class="tg-body" id="chat"></div>
+    </div>
+
+    <div class="ctrl">
+      <div class="row">
+        <button class="cb primary" id="nextBtn">▶ 다음날</button>
+        <button class="cb" id="stopBtn">⏸ 정지</button>
+        <button class="cb reconf" id="cfgBtn">다시 설정하기</button>
+      </div>
+      <div class="speedlbl">자동재생 배속 (틱마다 N일 진행 · 다시 누르면 정지)</div>
+      <div class="row">
+        <button class="cb spd" id="spd1" data-s="1">×1배속</button>
+        <button class="cb spd" id="spd10" data-s="10">×10배속</button>
+        <button class="cb spd" id="spd100" data-s="100">×100배속</button>
+        <button class="cb spd" id="spd365" data-s="365">×365배속</button>
+      </div>
+      <div class="row">
+        <button class="cb" id="statusBtn">현황</button>
+        <button class="cb" id="endBtn">끝까지</button>
+        <button class="cb ghost" id="restartBtn">재시작</button>
+        <button class="cb warn" id="resetBtn">초기화</button>
+      </div>
+      <div class="note">×1=하루씩 · ×10=10일 · ×100=100일 · ×365=1년씩 자동 진행<br>✔ 비용 반영: 슬리피지 0.02% · 왕복수수료 0.04% · 펀딩 0.005%/개장일</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/*__DATA__*/
+
+/* ================= 무한순환 실데이터 백테스터 ================= */
+const KEY='infinite_cycle_backtest_v2';
+let S=null, auto=null;
+/* 비용: 슬리피지 0.02% + 왕복수수료 0.04%(0.02%/side) + 펀딩 0.005%/개장일 */
+const COST={slip:0.0002, commSide:0.0002, fund:0.00005};
+const TXN=COST.slip+COST.commSide; // 거래 1회(편도) 노셔널 대비 0.04%
+
+const $=id=>document.getElementById(id);
+function intToDate(n){const s=''+n;return s.slice(0,4)+'.'+s.slice(4,6)+'.'+s.slice(6,8);}
+function intToDateK(n){const s=''+n;return `${s.slice(0,4)}년 ${s.slice(4,6)}월 ${s.slice(6,8)}일`;}
+function intToISO(n){const s=''+n;return s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8);}
+function isoToInt(s){return parseInt(s.replace(/-/g,''));}
+
+/* ---------- 설정화면 초기화 + 달력 ---------- */
+let selAsset='QQQ';
+const FLOOR={QQQ:20040101,NDX:19850102,TQQQ:20100211};
+let selStart=null, selEnd=null, calWhich=null, calY=2024, calM=1;
+const DOW=['일','월','화','수','목','금','토'];
+const intY=n=>Math.floor(n/10000), intM=n=>Math.floor(n/100)%100, intD=n=>n%100;
+const mk=(y,m,d)=>y*10000+m*100+d;
+
+function refreshRange(){
+  const arr=DATA[selAsset];
+  let a=arr[0][0]; const fl=FLOOR[selAsset]||0; if(fl>a)a=fl;
+  const b=arr[arr.length-1][0];
+  const fi=arr.findIndex(r=>r[0]>=a);
+  $('dataRange').textContent=`${selAsset} 데이터: ${intToDate(a)} ~ ${intToDate(b)} (${arr.length-(fi<0?0:fi)}거래일)`;
+  selEnd=b;
+  const startInt = selAsset==='TQQQ'?20200102:(selAsset==='NDX'?20000101:20180102);
+  selStart=(startInt>=a)?startInt:a;
+  calWhich=null; $('calBox').innerHTML='';
+  document.querySelectorAll('#rangePresets .chip').forEach(x=>x.classList.remove('sel'));
+  updateDateDisplay(); updateReadout();
+}
+function updateDateDisplay(){
+  const t0=$('d0txt'), t1=$('d1txt');
+  if(selStart){t0.textContent=intToDate(selStart);t0.classList.remove('ph');}else{t0.textContent='날짜 선택';t0.classList.add('ph');}
+  if(selEnd){t1.textContent=intToDate(selEnd);t1.classList.remove('ph');}else{t1.textContent='날짜 선택';t1.classList.add('ph');}
+  $('d0btn').classList.toggle('active',calWhich==='start');
+  $('d1btn').classList.toggle('active',calWhich==='end');
+}
+/* 선택된 기간을 실데이터 인덱스로 환산해 실시간 표시 */
+function updateReadout(){
+  const a=DATA[selAsset];
+  const ro=$('rangeReadout');
+  if(!selStart||!selEnd){ro.textContent='시작일·종료일을 선택하세요';return;}
+  let s0=selStart, s1=selEnd; if(s0>s1){const t=s0;s0=s1;s1=t;} const _fl=FLOOR[selAsset]||0; if(_fl>s0)s0=_fl;
+  let i0=a.findIndex(r=>r[0]>=s0); if(i0<0)i0=0;
+  let i1=a.length-1; for(let k=a.length-1;k>=0;k--){if(a[k][0]<=s1){i1=k;break;}}
+  if(i1<i0)i1=i0;
+  ro.innerHTML=`선택 기간 <b>${intToDate(a[i0][0])} ~ ${intToDate(a[i1][0])}</b> · ${i1-i0} 거래일`;
+}
+/* 달력 열기/렌더 */
+function openCal(which){
+  calWhich=which;
+  const base = which==='start' ? (selStart||DATA[selAsset][0][0]) : (selEnd||DATA[selAsset][DATA[selAsset].length-1][0]);
+  calY=intY(base); calM=intM(base);
+  renderCal(); updateDateDisplay();
+}
+function renderCal(){
+  const a=DATA[selAsset], dMin=Math.max(a[0][0],FLOOR[selAsset]||0), dMax=a[a.length-1][0];
+  const yMin=intY(dMin), yMax=intY(dMax);
+  if(calY<yMin)calY=yMin; if(calY>yMax)calY=yMax;
+  let yrs=''; for(let y=yMin;y<=yMax;y++) yrs+=`<option value="${y}" ${y===calY?'selected':''}>${y}년</option>`;
+  let mos=''; for(let m=1;m<=12;m++) mos+=`<option value="${m}" ${m===calM?'selected':''}>${m}월</option>`;
+  const first=new Date(calY,calM-1,1).getDay();
+  const dim=new Date(calY,calM,0).getDate();
+  const sel = calWhich==='start'?selStart:selEnd;
+  const lo=Math.min(selStart||0,selEnd||0), hi=Math.max(selStart||0,selEnd||0);
+  let cells=''; DOW.forEach(d=>cells+=`<div class="dow">${d}</div>`);
+  for(let i=0;i<first;i++) cells+='<div class="day empty"></div>';
+  for(let d=1;d<=dim;d++){
+    const di=mk(calY,calM,d);
+    const dis = di<dMin||di>dMax;
+    let cls='day'; if(dis)cls+=' dis'; else{ if(di===sel)cls+=' sel'; else if(lo&&hi&&di>lo&&di<hi)cls+=' inrange'; }
+    cells+=`<div class="${cls}" ${dis?'':`data-d="${di}"`}>${d}</div>`;
+  }
+  $('calBox').innerHTML=`<div class="cal">
+    <div class="cal-which">${calWhich==='start'?'시작일':'종료일'} 선택</div>
+    <div class="cal-hd">
+      <button data-nav="-1">‹</button>
+      <select id="calYsel">${yrs}</select>
+      <select id="calMsel">${mos}</select>
+      <button data-nav="1">›</button>
+    </div>
+    <div class="cal-grid">${cells}</div>
+    <button class="cal-close" data-close="1">닫기</button>
+  </div>`;
+}
+function calStep(d){ calM+=d; if(calM<1){calM=12;calY--;} if(calM>12){calM=1;calY++;} renderCal(); }
+function pickDay(di){
+  if(calWhich==='start') selStart=di; else selEnd=di;
+  document.querySelectorAll('#rangePresets .chip').forEach(x=>x.classList.remove('sel'));
+  updateDateDisplay(); updateReadout();
+  // 시작일 고르면 종료일 달력으로 자동 이동(종료일 미설정/역전 시)
+  if(calWhich==='start'){ calWhich='end'; if(!selEnd||selEnd<selStart){} openCal('end'); }
+  else { renderCal(); }
+}
+function closeCal(){ calWhich=null; $('calBox').innerHTML=''; updateDateDisplay(); }
+$('d0btn').addEventListener('click',()=>openCal('start'));
+$('d1btn').addEventListener('click',()=>openCal('end'));
+$('calBox').addEventListener('click',e=>{
+  const t=e.target; if(!t.closest)return;
+  const day=t.closest('.day'); if(day&&day.dataset.d){pickDay(+day.dataset.d);return;}
+  const nav=t.closest('[data-nav]'); if(nav){calStep(+nav.dataset.nav);return;}
+  if(t.closest('[data-close]')){closeCal();return;}
+});
+$('calBox').addEventListener('change',e=>{
+  if(e.target.id==='calYsel'){calY=+e.target.value;renderCal();}
+  else if(e.target.id==='calMsel'){calM=+e.target.value;renderCal();}
+});
+/* 빠른 선택: 종료일=데이터 마지막, 시작일=N년 전(0=전체) */
+$('rangePresets').addEventListener('click',e=>{
+  const c=e.target.closest('.chip'); if(!c)return;
+  document.querySelectorAll('#rangePresets .chip').forEach(x=>x.classList.remove('sel'));
+  c.classList.add('sel');
+  const a=DATA[selAsset], last=a[a.length-1][0], first=a[0][0], y=+c.dataset.y;
+  selEnd=last;
+  if(y===0){ selStart=first; }
+  else{ const ly=intY(last), md=last%10000; let st=(ly-y)*10000+md; if(st<first)st=first; selStart=st; }
+  calWhich=null; $('calBox').innerHTML='';
+  updateDateDisplay(); updateReadout();
+});
+$('assetChips').addEventListener('click',e=>{
+  const c=e.target.closest('.chip'); if(!c)return;
+  document.querySelectorAll('#assetChips .chip').forEach(x=>x.classList.remove('sel'));
+  c.classList.add('sel'); selAsset=c.dataset.a;
+  $('lev').value = selAsset==='TQQQ'?1:3; $('levV').textContent=$('lev').value+'배';
+  refreshRange();
+});
+$('lev').addEventListener('input',e=>$('levV').textContent=e.target.value+'배');
+
+/* ---------- 구동 시작: 설정 읽고 상태 생성 ---------- */
+function buildConfig(){
+  const arr=DATA[selAsset];
+  let s0=selStart, s1=selEnd;
+  if(s0>s1){const t=s0;s0=s1;s1=t;}
+  const fl=FLOOR[selAsset]||0; if(fl>s0)s0=fl;
+  let i0=arr.findIndex(r=>r[0]>=s0); if(i0<0)i0=0;
+  let i1=arr.length-1; for(let k=arr.length-1;k>=0;k--){if(arr[k][0]<=s1){i1=k;break;}}
+  if(i1<i0)i1=i0;
+  return {
+    asset:selAsset, cap:+$('cap').value||10000, lev:+$('lev').value,
+    eUp:+$('eUp').value, eDn:+$('eDn').value,
+    utp:+$('utp').value, dtp:+$('dtp').value,
+    grow:+$('sUp').value, store:+$('sPct').value, drop:+$('iDn').value, inj:+$('iPct').value,
+    i0, i1
+  };
+}
+function fresh(cfg){
+  const arr=DATA[cfg.asset]; const px=arr[cfg.i0][3];
+  return {cfg, i:cfg.i0, px, prevPx:px,
+    cash:cfg.cap, vault:0, pos:[], grow_base:cfg.cap, peak:cfg.cap, drop_base:null,
+    realized:0, costs:0, tpTotal:0,
+    storeCnt:0,injCnt:0,liqCnt:0,qcCnt:0,tpCnt:0,
+    lastStorePx:null,lastInjPx:null,lastQcPx:null,lastTpPx:null,lastLiqPx:null,
+    peakTot:cfg.cap, mdd:0, curve:[[arr[cfg.i0][0],cfg.cap]],
+    started:true, done:false, log:[]};
+}
+
+/* ---------- 원본 backtest() 그대로 이식 ---------- */
+const C=()=>S.cfg;
+function K(){const c=C(),isT=c.asset==='TQQQ';
+  return {COST:isT?(0.0014/2+0.0003):(0.0004/2+0.0003), FUND:isT?0:0.00005,
+    LEV:isT?1:c.lev, LIQ:isT?null:({1:null,2:-0.5,3:-1/3,4:-0.25}[c.lev]),
+    GROW:1+c.grow/100, DROPT:1-c.drop/100, INJ:c.inj/100, STORE:c.store/100,
+    safety:c.store>0, tpScale:isT?3:1, CAP:0.98, QF:0.25};}
+const msum=()=>S.pos.reduce((a,p)=>a+p.m,0);
+const uPnLv=()=>S.pos.reduce((a,p)=>a+p.n*(S.px/p.ep-1),0);
+const eqopRaw=()=>S.cash+msum()+uPnLv();
+const opv=()=>Math.max(eqopRaw(),0);
+const total=()=>opv()+S.vault;
+const curNotional=()=>S.pos.reduce((a,p)=>a+p.n*(S.px/p.ep),0);
+function avgEp(){let n=0,sh=0;for(const p of S.pos){n+=p.n;sh+=p.n/p.ep;}return sh>0?n/sh:0;}
+function qc(px,k){if(!S.pos.length)return;const tgt=msum()*k.QF;let freed=0;S.pos.sort((a,b)=>b.tpp-a.tpp);
+  while(S.pos.length&&freed<tgt){const p=S.pos.shift();const fee=p.n*(px/p.ep)*k.COST,pnl=p.n*(px/p.ep-1);
+    S.cash+=p.m+pnl-fee;S.realized+=pnl-fee;S.costs+=fee;freed+=p.m;}}
+
+function step(){
+  if(S.done)return;
+  const arr=DATA[C().asset];
+  if(S.i>=C().i1){ finish(); return; }
+  S.i++; S.prevPx=S.px;
+  const row=arr[S.i], hi=row[1], lo=row[2], px=row[3]; S.px=px;
+  const k=K(), dk=intToDateK(row[0]);
+  const assetK=C().asset+(C().asset==='NDX'?'(나스닥100 지수)':(C().asset==='TQQQ'?'(3배 ETF)':'(나스닥100 ETF)'));
+  const isUp=px>=S.prevPx; const msgs=[];
+  // 1) 펀딩비 (개장일, 노셔널 기준)
+  if(S.pos.length&&k.FUND>0){const ff=S.pos.reduce((a,p)=>a+p.n*(px/p.ep)*k.FUND,0);S.cash-=ff;S.realized-=ff;S.costs+=ff;}
+  // 2) 청산 + 익절 스윕 (당일 진입 로트 제외)
+  let tpUp=0,tpDn=0,tpN=0,liqLoss=0,liqN=0; const keep=[];
+  for(const p of S.pos){
+    if(p.ei===S.i){keep.push(p);continue;}
+    if(k.LIQ!==null && lo<=p.ep*(1+k.LIQ)){
+      const fee=p.n*(1+k.LIQ)*k.COST, back=p.m+p.n*k.LIQ;
+      S.cash-=fee; S.cash+=back; S.realized+=(p.n*k.LIQ)-fee; S.costs+=fee; liqLoss+=p.n*k.LIQ; liqN++;
+    } else if(hi>=p.tpp){
+      const fee=p.n*(1+p.tp)*k.COST, profit=p.n*p.tp;
+      S.cash+=p.m+profit-fee; S.realized+=profit-fee; S.tpTotal+=profit; S.costs+=fee;
+      if(p.up)tpUp+=profit; else tpDn+=profit; tpN++;
+    } else keep.push(p);
+  }
+  S.pos=keep;
+  if(liqN>0){S.liqCnt+=liqN;S.lastLiqPx=px;
+    msgs.push({cls:'liq',txt:`<span class="hd">${dk}</span><span class="neg">■ 강제청산</span>\n저가가 진입가 −${Math.round(Math.abs(k.LIQ)*100)}% 터치 → 해당 로트 <b>${liqN}건</b> 청산(증거금 소멸).\n<span class="lab">손실 약 ${fmt(liqLoss)} USD · 누적 청산 ${S.liqCnt}건</span>`});}
+  if(tpN>0){S.tpCnt+=tpN;S.lastTpPx=px;
+    msgs.push({cls:'tp',txt:`<span class="hd">${dk}</span><span class="up">▲ 익절 (Take-Profit)</span>\n오늘 익절 <b>+${fmt(tpUp+tpDn)} USD</b> · ${tpN}건 (고가가 목표가 도달)\n· 상승일 매수분 +${C().utp}%: ${fmt(tpUp)} USD · 하락일 매수분 +${C().dtp}%: ${fmt(tpDn)} USD\n<span class="lab">누적 익절 +${fmt(S.tpTotal)} USD · 가용현금 ${fmt(S.cash)} USD</span>`});}
+  // 3) 분할매수 (+ 한도 초과 시 쿼터컷)
+  let qcN=0, bought=0; const opv0=opv(), cap=opv0*k.CAP;
+  const rate=(isUp?C().eUp:C().eDn)/100; let margin=opv0*rate;
+  if(margin>0){
+    let g=0; while((msum()+margin>cap||S.cash<margin)&&S.pos.length&&g<200){qc(px,k);qcN++;g++;}
+    if(S.cash>=margin && msum()+margin<=cap+1e-6){
+      const n=margin*k.LEV, fee=n*k.COST; S.cash-=margin+fee; S.costs+=fee; S.realized-=fee;
+      const tpv=(isUp?C().utp:C().dtp)/100*k.tpScale;
+      S.pos.push({ei:S.i,m:margin,n:n,ep:px,tp:tpv,tpp:px*(1+tpv),up:isUp}); bought=margin;
+    }
+  }
+  if(qcN>0){S.qcCnt+=qcN;S.lastQcPx=px;
+    msgs.push({cls:'qc',txt:`<span class="hd">${dk}</span><span class="qcicon">◆ 쿼터컷 (Quarter-Cut)</span>\n운용자산 98% 한도 도달 → 목표가 높은(물린) 로트부터 ${qcN}회 정리해 매수 여력 확보.\n<span class="lab">가용현금 ${fmt(S.cash)} USD · 누적 ${S.qcCnt}회</span>`});}
+  if(bought>0.005){
+    msgs.push({cls:'buy',txt:`<span class="hd">${dk}</span>${assetK} 일봉 <b>${isUp?'상승마감':'하락마감'}</b>\n${isUp?'상승일':'하락일'} (+${isUp?C().eUp:C().eDn}% 매수): <b>${fmt(bought)} USD</b> 매수 · 익절목표 <b>+${Math.round((isUp?C().utp:C().dtp)*k.tpScale)}%</b>\n<span class="lab">현재가 ${fmt2(px)} USD · 평단가 ${fmt2(avgEp())} USD · 운용 ${fmt(opv())} USD</span>`});
+  } else {
+    msgs.push({cls:'hold',txt:`<span class="hd">${dk}</span>${assetK} 일봉 <b>${isUp?'상승마감':'하락마감'}</b> · 보유 ${S.pos.length}로트 · 매수보류\n<span class="lab">현재가 ${fmt2(px)} USD · 가용현금 ${fmt(S.cash)} USD</span>`});
+  }
+  // 4) 보관 / 투입
+  const o=opv(), tot=o+S.vault;
+  if(k.safety){
+    if(o>=S.grow_base*k.GROW && o>0){const st=Math.min(tot*k.STORE,S.cash);
+      if(st>0){S.cash-=st;S.vault+=st;S.storeCnt++;S.lastStorePx=px;
+        msgs.push({cls:'store',txt:`<span class="hd">${dk}</span><span class="up">▲ 보관 (금고 확보)</span>\n운용자산이 기준 대비 +${C().grow}% 성장 → 총자산의 ${C().store}%(<b>${fmt(st)} USD</b>)를 금고로 이체.\n<span class="lab">금고 ${fmt(S.vault)} USD</span>`});}
+      S.grow_base=o;}
+    if(tot>S.peak){S.peak=tot;S.drop_base=null;}
+    const ref=S.drop_base!==null?S.drop_base:S.peak;
+    if(tot<=ref*k.DROPT && S.vault>0){const inj=S.vault*k.INJ;S.vault-=inj;S.cash+=inj;S.drop_base=tot;S.injCnt++;S.lastInjPx=px;
+      msgs.push({cls:'inj',txt:`<span class="hd">${dk}</span><span class="dn">▼ 투입 (재투입)</span>\n총자산이 기준 대비 −${C().drop}% 하락 → 금고의 ${C().inj}%(<b>${fmt(inj)} USD</b>)를 트레이딩으로 투입.\n<span class="lab">가용현금 ${fmt(S.cash)} USD · 금고 ${fmt(S.vault)} USD</span>`});}
+  } else { if(tot>S.peak)S.peak=tot; }
+  // 통계
+  if(tot>S.peakTot)S.peakTot=tot; const dd=S.peakTot>0?(tot/S.peakTot-1)*100:0; if(dd<S.mdd)S.mdd=dd;
+  S.curve.push([row[0],tot]); if(S.curve.length>6000)S.curve.shift();
+  msgs.forEach(m=>botMsg(m.txt,m.cls,true));
+  if(elapsedDays()%21===0) statusMsg('일일');
+  updTicker(); drawChart();
+  if(S.i>=C().i1) finish();
+  save();
+}
+function elapsedDays(){return S.i-C().i0;}
+function finish(){
+  if(S.done)return; S.done=true; stopAuto();
+  const ret=(total()/C().cap-1)*100;
+  const years=Math.max(elapsedDays(),1)/252, cagr=total()>0?(Math.pow(total()/C().cap,1/years)-1)*100:-100;
+  botMsg(`<span class="hd">🏁 백테스트 완료</span>${intToDate(DATA[C().asset][C().i0][0])} ~ ${intToDate(DATA[C().asset][S.i][0])} · ${elapsedDays()}거래일`+statusCard()+
+    `<div class="grid2"><div class="k">총수익률</div><div class="${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>`+
+    `<div class="k">연복리(CAGR)</div><div class="${cagr>=0?'pos':'neg'}">${cagr>=0?'+':''}${cagr.toFixed(1)}%</div>`+
+    `<div class="k">최대낙폭(MDD)</div><div class="neg">${S.mdd.toFixed(1)}%</div>`+
+    `<div class="k">익절/청산</div><div>${S.tpCnt}건 / ${S.liqCnt}건</div>`+
+    `<div class="k">보관/투입</div><div>${S.storeCnt}회 / ${S.injCnt}회</div>`+
+    `<div class="k">쿼터컷</div><div>${S.qcCnt||0}회</div></div>`,'store');
+  save();
+}
+
+/* ---------- 출력 ---------- */
+function fmt(n){return (Math.round(n*10)/10).toFixed(1);}
+function fmt2(n){return (Math.round(n*100)/100).toFixed(2);}
+function curDate(){return intToDate(DATA[C().asset][S.i][0]);}
+function pushLog(h,c){S.log.push({h,c});if(S.log.length>500)S.log.shift();}
+function render(h,c){const ch=$('chat');const e=document.createElement('div');e.className='b '+c;e.innerHTML=h;ch.appendChild(e);while(ch.children.length>400)ch.removeChild(ch.firstChild);ch.scrollTop=ch.scrollHeight;}
+function botMsg(t,x,noTm){const h=t+(noTm?'':`<div class="tm">${curDate()}</div>`);const c='bot '+(x||'');pushLog(h,c);if(!bulk)render(h,c);save();}
+function usrMsg(t){const h=`<span class="mono">${t}</span>`;pushLog(h,'usr');render(h,'usr');}
+function sysMsg(t){pushLog(t,'sys');render(t,'sys');}
+function divMsg(t){pushLog(t,'div');render(t,'div');}
+
+function statusCard(){
+  const r1=v=>Math.round(v*10)/10;
+  const o=r1(opv()), v=r1(S.vault), tot=r1(o+v), cash=r1(S.cash);
+  const pnl=uPnLv(), held=S.pos.length>0, ae=avgEp();
+  const dReal=r1(S.realized), dPnl=r1(pnl);
+  return `<div class="totbox"><b class="big">총자산 ${tot.toFixed(1)} USD</b>
+<span class="lab"> = 트레이딩(운용) ${o.toFixed(1)} + 금고 ${v.toFixed(1)} USD
+초기 ${C().cap.toFixed(1)} USD · 확정손익 <span class="${dReal>=0?'pos':'neg'}">${dReal>=0?'+':''}${dReal.toFixed(1)} USD</span> · 평가손익 <span class="${dPnl>=0?'pos':'neg'}">${dPnl>=0?'+':''}${dPnl.toFixed(1)} USD</span></span></div>
+<div class="acct"><div class="acc t"><div class="l">트레이딩 계좌(운용)</div><div class="v">${o.toFixed(1)} USD</div></div>
+<div class="acc f"><div class="l">펀딩 계좌(금고)</div><div class="v">${v.toFixed(1)} USD</div></div></div>
+<div class="grid2">
+<div class="k">보유 로트</div><div>${held?`${S.pos.length}건 · 노셔널 ${fmt(curNotional())} USD`:'없음(대기)'}</div>
+<div class="k">평단가</div><div>${held?fmt2(ae)+' USD':'—'}</div>
+<div class="k">현재가</div><div>${fmt2(S.px)} USD</div>
+<div class="k">가용현금</div><div>${fmt(cash)} USD</div>
+<div class="k">평가손익</div><div class="${pnl>=0?'pos':'neg'}">${held?`${pnl>=0?'+':''}${fmt(pnl)} USD`:'—'}</div>
+<div class="k">확정 익손실</div><div class="${S.realized>=0?'pos':'neg'}">${S.realized>=0?'+':''}${fmt(S.realized)} USD</div>
+<div class="k">누적 익절</div><div class="pos">+${fmt(S.tpTotal)} USD · ${S.tpCnt||0}건</div>
+<div class="k">강제청산</div><div>${(S.liqCnt||0)}건</div>
+<div class="k">쿼터컷</div><div>${(S.qcCnt||0)}회</div>
+<div class="k">총 비용</div><div class="neg">−${fmt(S.costs||0)} USD</div>
+</div>`;
+}
+function statusMsg(kind){
+  const c=C();
+  const head = kind==='재시작'
+   ? `<span class="hd">🔄 재시작 현황 · ${c.asset}</span>${c.asset} · ${c.lev}배 · 진입 상승${c.eUp}%/하락${c.eDn}% · 익절 +${c.utp}%/+${c.dtp}% · 보관 운용+${c.grow}%→총${c.store}% · 투입 −${c.drop}%→금고${c.inj}%\n기간 ${intToDate(DATA[c.asset][c.i0][0])}~${intToDate(DATA[c.asset][c.i1][0])}`
+   : `<span class="hd">📅 ${kind} 현황 · ${curDate()}</span>`;
+  botMsg(head+statusCard());
+}
+
+function updTicker(){
+  $('pxLbl').textContent=fmt2(S.px)+' USD';
+  // 큰 날짜 (YYYY년 MM월 DD일) — 일자 바뀔 때 애니메이션
+  const di=DATA[C().asset][S.i][0], ds=''+di;
+  const bd=$('bigDate'), txt=`${ds.slice(0,4)}년 ${ds.slice(4,6)}월 ${ds.slice(6,8)}일`;
+  if(bd.dataset.v!==txt){ bd.innerHTML=`<span class="yd">${ds.slice(0,4)}년</span> ${ds.slice(4,6)}월 ${ds.slice(6,8)}일`; bd.dataset.v=txt; bd.classList.remove('flip'); void bd.offsetWidth; bd.classList.add('flip'); }
+  $('dateLbl').textContent=(elapsedDays())+'거래일차';
+  const d=S.px-S.prevPx, p=S.prevPx?d/S.prevPx*100:0, c=$('chgLbl');
+  c.textContent=(d>=0?'▲ +':'▼ ')+fmt2(d)+' USD ('+(p>=0?'+':'')+p.toFixed(2)+'%)';
+  c.className='chg '+(d>=0?'up':'dn');
+  $('progLbl').textContent=Math.round(elapsedDays()/(C().i1-C().i0||1)*100)+'%';
+  const cap=C().cap, tot=total(), ret=cap>0?(tot/cap-1)*100:0;
+  $('abStart').textContent=Math.round(cap).toLocaleString()+' USD';
+  $('abNow').textContent=Math.round(tot).toLocaleString()+' USD';
+  const ar=$('abRet'); ar.textContent=(ret>=0?'총수익률 +':'총수익률 ')+ret.toFixed(1)+'%'; ar.className='ab-ret '+(ret>=0?'up':'dn');
+}
+function usdShort(v){const a=Math.abs(v);if(a>=1e6)return(v/1e6).toFixed(1)+'M';if(a>=1e3)return(v/1e3).toFixed(a>=1e4?0:1)+'k';return Math.round(v)+'';}
+function dateShort(n){const s=''+n;return s.slice(2,4)+'.'+s.slice(4,6);}
+function drawChart(){
+  const cv=$('chart'),ctx=cv.getContext('2d');
+  const W=Math.max(300, cv.clientWidth||cv.offsetWidth||360), H=150;
+  cv.width=W; cv.height=H; ctx.clearRect(0,0,W,H);
+  const cur=S.curve; if(cur.length<2)return;
+  const mL=58,mR=12,mT=10,mB=22, pw=W-mL-mR, ph=H-mT-mB;
+  let mn=Infinity,mx=-Infinity; for(const p of cur){if(p[1]<mn)mn=p[1];if(p[1]>mx)mx=p[1];}
+  if(mx-mn<1e-6)mx=mn+1;
+  const pad=(mx-mn)*0.08; mn=Math.max(0,mn-pad); mx+=pad;
+  const x=i=>mL+i/(cur.length-1)*pw, y=v=>mT+ph-(v-mn)/(mx-mn)*ph;
+  const cap=C().cap;
+  ctx.font='10px ui-monospace,monospace';
+  // y축 (총자산 USD) — 그리드 + 라벨
+  ctx.textBaseline='middle';ctx.textAlign='right';
+  for(let i=0;i<=4;i++){const v=mn+(mx-mn)*i/4, yy=y(v);
+    ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(mL,yy);ctx.lineTo(W-mR,yy);ctx.stroke();
+    ctx.fillStyle='rgba(150,200,180,.65)';ctx.fillText(usdShort(v),mL-6,yy);}
+  // 초기자본 기준선
+  ctx.strokeStyle='rgba(255,255,255,.2)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(mL,y(cap));ctx.lineTo(W-mR,y(cap));ctx.stroke();ctx.setLineDash([]);
+  // x축 (날짜) 라벨
+  ctx.textBaseline='top';ctx.fillStyle='rgba(150,200,180,.65)';
+  for(let i=0;i<=4;i++){const idx=Math.round((cur.length-1)*i/4), xx=x(idx);
+    ctx.textAlign=i===0?'left':(i===4?'right':'center');ctx.fillText(dateShort(cur[idx][0]),xx,H-mB+5);}
+  // 축 단위 라벨
+  ctx.save();ctx.translate(11,mT+ph/2);ctx.rotate(-Math.PI/2);ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(150,200,180,.5)';ctx.fillText('총자산 USD',0,0);ctx.restore();
+  // 영역 + 라인
+  const last=cur[cur.length-1][1], col=last>=cap?'0,255,157':'255,92,92';
+  const g=ctx.createLinearGradient(0,mT,0,mT+ph);g.addColorStop(0,`rgba(${col},.30)`);g.addColorStop(1,`rgba(${col},0)`);
+  ctx.beginPath();ctx.moveTo(x(0),y(cur[0][1]));for(let i=1;i<cur.length;i++)ctx.lineTo(x(i),y(cur[i][1]));
+  ctx.lineTo(x(cur.length-1),mT+ph);ctx.lineTo(x(0),mT+ph);ctx.closePath();ctx.fillStyle=g;ctx.fill();
+  ctx.beginPath();ctx.moveTo(x(0),y(cur[0][1]));for(let i=1;i<cur.length;i++)ctx.lineTo(x(i),y(cur[i][1]));
+  ctx.strokeStyle=`rgb(${col})`;ctx.lineWidth=2;ctx.stroke();
+}
+
+/* ---------- 저장/복구 ---------- */
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function load(){try{return JSON.parse(localStorage.getItem(KEY));}catch(e){return null;}}
+function replay(){$('chat').innerHTML='';S.log.forEach(m=>render(m.h,m.c));}
+
+/* ---------- 화면 전환 ---------- */
+function showSim(){$('setup').classList.add('hidden');$('sim').classList.remove('hidden');}
+function showSetup(){$('sim').classList.add('hidden');$('setup').classList.remove('hidden');}
+
+let playing=false, bulk=false;
+function setBtns(dis){document.querySelectorAll('#sim .cb').forEach(b=>b.disabled=dis);}
+function botSay(t){pushLog(t,'bot');render(t,'bot');save();}       // 날짜표시 없는 봇 말풍선
+
+function boot(){
+  const c=C();
+  $('symLbl').innerHTML=`${c.asset} <small>${c.lev}배</small>`;
+  $('symHd').textContent=c.asset;
+  renderSetBar();
+  updTicker(); drawChart();
+  playOnboarding();
+}
+function renderSetBar(){
+  const c=C(), a=DATA[c.asset];
+  $('setBar').innerHTML=`<b>설정</b> ${c.asset} · ${c.lev}배 · 진입 상승${c.eUp}%/하락${c.eDn}% · 익절 상승+${c.utp}%/하락+${c.dtp}% · 보관 운용+${c.grow}%→총${c.store}% · 투입 −${c.drop}%→금고${c.inj}%
+<b>기간</b> <span class="pd">${intToDate(a[c.i0][0])} ~ ${intToDate(a[c.i1][0])}</span> · ${c.i1-c.i0}거래일 · 총계좌 ${c.cap.toLocaleString()} USD`;
+}
+
+/* 실제 봇처럼: 봇이 질문 → 유저가 설정값으로 답변 (애니메이션) */
+function playOnboarding(){
+  const c=C();
+  const d0=intToDate(DATA[c.asset][c.i0][0]), d1=intToDate(DATA[c.asset][c.i1][0]);
+  const seq=[
+    {t:'bot',m:`<span class="hd">[봇] 무한순환</span>안녕하세요! 백테스트 설정을 시작할게요.\n먼저 운용하실 <b>총 계좌 금액</b>을 입력해주세요. (USD)`},
+    {t:'usr',m:`${c.cap}`},
+    {t:'bot',m:`확인 — 총 계좌 <b>${c.cap.toLocaleString()} USD</b>.`},
+    {t:'bot',m:`<span class="prog">[1/7] 종목</span>\n운용할 <b>종목</b>을 하나 골라주세요. 무한순환은 단일 종목·중복투자 없음.\n( QQQ · TQQQ · NDX )`},
+    {t:'usr',m:`${c.asset}`},
+    {t:'bot',m:`확인 — <b>${c.asset}</b> 단일 포지션으로 운용합니다.`},
+    {t:'bot',m:`<span class="prog">[2/7] 레버리지</span>\n<b>레버리지</b> 배율을 입력하세요.`},
+    {t:'usr',m:`${c.lev}배`},
+    {t:'bot',m:`확인 — <b>${c.lev}배</b> 적용 · 주의: 레버리지는 원금 전액 손실(강제청산) 가능.`},
+    {t:'bot',m:`<span class="prog">[3/7] 분할매수</span>\n매일 <b>분할매수</b> 비율을 알려주세요. 상승일 / 하락일 (운용자산 대비 %)`},
+    {t:'usr',m:`상승 ${c.eUp} / 하락 ${c.eDn}`},
+    {t:'bot',m:`확인 — 상승일 <b>${c.eUp}%</b> · 하락일 <b>${c.eDn}%</b> 분할매수.`},
+    {t:'bot',m:`<span class="prog">[4/7] 익절 방식</span>\n매수분 <b>익절</b> 목표를 알려주세요. 상승일 매수분 / 하락일 매수분 (매수가 대비 +%)`},
+    {t:'usr',m:`상승분 +${c.utp}% / 하락분 +${c.dtp}%`},
+    {t:'bot',m:`확인 — 상승일 매수분 <b>+${c.utp}%</b> · 하락일 매수분 <b>+${c.dtp}%</b> 도달 시 자동 익절.`},
+    {t:'bot',m:`<span class="prog">[5/7] 보관(금고)</span>\n<b>보관</b> 규칙: 운용자산이 +N% 성장하면 총자산의 M%를 금고로. 형식: <span class="mono">보관 발동% 비율%</span>`},
+    {t:'usr',m:`보관 ${c.grow} ${c.store}`},
+    {t:'bot',m:`확인 — 운용 <b>+${c.grow}%</b> 성장마다 총자산 <b>${c.store}%</b> → 금고 보관.`},
+    {t:'bot',m:`<span class="prog">[6/7] 투입</span>\n<b>투입</b> 규칙: 총자산이 −M% 하락하면 금고의 Y%를 트레이딩으로. 형식: <span class="mono">투입 발동% 비율%</span>`},
+    {t:'usr',m:`투입 ${c.drop} ${c.inj}`},
+    {t:'bot',m:`확인 — <b>−${c.drop}%</b> 하락마다 금고 <b>${c.inj}%</b> → 트레이딩 재투입.`},
+    {t:'bot',m:`<span class="prog">[7/7] 기간</span>\n<b>백테스트 기간</b>을 확인합니다.`},
+    {t:'usr',m:`${d0} ~ ${d1}`},
+    {t:'bot',m:`확인 — 기간 <b>${d0} ~ ${d1}</b> (${c.i1-c.i0}거래일).`},
+    {t:'bot',m:`<span class="hd">설정 완료</span>실데이터 백테스트를 시작합니다. 아래 <b>다음날</b> 또는 <b>자동</b>을 눌러 진행하세요.`},
+    {t:'status'}
+  ];
+  playing=true; setBtns(true);
+  divMsg('① 설정 (봇 대화)');
+  usrMsg('/start');
+  let k=0;
+  (function nextMsg(){
+    if(k>=seq.length){ playing=false; setBtns(false); save(); sysMsg('설정값대로 자동 구동을 시작합니다…'); setTimeout(startAuto,700); return; }
+    const s=seq[k++];
+    if(s.t==='bot') botSay(s.m);
+    else if(s.t==='usr') usrMsg(s.m);
+    else if(s.t==='status') statusMsg('초기');
+    setTimeout(nextMsg, s.t==='usr'?430 : s.t==='status'?250 : 600);
+  })();
+}
+
+/* ---------- 컨트롤 ---------- */
+let autoSpeed=0; const SPEEDS=[1,10,100,365];
+function hiSpeed(n){SPEEDS.forEach(s=>{const b=$('spd'+s);if(b)b.classList.toggle('on',n===s);});}
+function stopAuto(){if(auto){clearInterval(auto);auto=null;}autoSpeed=0;hiSpeed(0);}
+function startAuto(){setSpeed(1);}
+function setSpeed(n){if(playing)return;if(auto&&autoSpeed===n){stopAuto();return;}stopAuto();if(S&&S.done)return;autoSpeed=n;hiSpeed(n);auto=setInterval(()=>tick(n),900);}
+function tick(n){if(!S||S.done){stopAuto();return;}if(n===1){step();return;}bulk=true;const b0={tp:S.tpCnt,liq:S.liqCnt,st:S.storeCnt,inj:S.injCnt,qc:S.qcCnt,tot:total()};for(let i=0;i<n&&!S.done;i++)step();bulk=false;const ret=b0.tot>0?(total()/b0.tot-1)*100:0;botMsg(`<span class="hd">⏩ ×${n} 배속 · ${intToDateK(DATA[C().asset][S.i][0])}</span>총자산 <b>${fmt(total())} USD</b> · 구간 <span class="${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</span>\n익절 ${S.tpCnt-b0.tp} · 청산 ${S.liqCnt-b0.liq} · 보관 ${S.storeCnt-b0.st} · 투입 ${S.injCnt-b0.inj} · 쿼터컷 ${S.qcCnt-b0.qc}`,'snap',true);updTicker();drawChart();save();if(S.done)stopAuto();}
+$('runBtn').onclick=()=>{try{stopAuto();localStorage.removeItem(KEY);S=fresh(buildConfig());showSim();boot();}catch(err){alert('구동 오류: '+err.message);console.error(err);}};
+$('nextBtn').onclick=()=>{if(playing)return;stopAuto();step();};
+$('stopBtn').onclick=()=>{stopAuto();};
+$('spd1').onclick=()=>setSpeed(1);
+$('spd10').onclick=()=>setSpeed(10);
+$('spd100').onclick=()=>setSpeed(100);
+$('spd365').onclick=()=>setSpeed(365);
+$('endBtn').onclick=()=>{if(playing)return;stopAuto();bulk=true;let n=0;while(!S.done&&n<9000){step();n++;}bulk=false;replay();drawChart();updTicker();};
+$('statusBtn').onclick=()=>{if(playing)return;usrMsg('/현황');statusMsg('요청');};
+$('restartBtn').onclick=()=>{stopAuto();const sv=load();if(!sv){alert('저장된 데이터가 없습니다.');return;}S=sv;playing=false;setBtns(false);replay();sysMsg('[재시작] 저장 상태 로드 → 현황 발송 후 이어서 구동');statusMsg('재시작');sysMsg('잔고·평단가·기준가·확정손익 그대로 복구 → 끊김 없이 재개');updTicker();drawChart();save();};
+$('cfgBtn').onclick=()=>{stopAuto();showSetup();};
+$('resetBtn').onclick=()=>{if(!confirm('모든 데이터를 지우고 설정부터 다시 시작할까요?'))return;stopAuto();localStorage.removeItem(KEY);S=null;$('chat').innerHTML='';showSetup();};
+
+/* ---------- 시작 ---------- */
+(function init(){
+  refreshRange();
+  showSetup();   // 사이트 진입 시 항상 설정 화면 먼저
+})();
+</script>
+</body>
+</html>
